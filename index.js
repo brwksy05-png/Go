@@ -7,37 +7,41 @@ const { v4: uuidv4 } = require('uuid');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 if (!BOT_TOKEN) {
-  console.error("❌ خطأ: يرجى إضافة BOT_TOKEN في Variables داخل منصة Railway!");
+  console.error("❌ خطأ: يرجى ضبط المتغير BOT_TOKEN في إعدادات Railway");
   process.exit(1);
 }
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
+// إعداد البروكسي العراقي مع إجبار حل الـ DNS داخل السيرفر
 const PROXY_URL = process.env.PROXY_URL || "socks5://14a960b9eca06:21dd78f1a2@181.215.144.223:12324";
-const agent = new SocksProxyAgent(PROXY_URL);
+const agent = new SocksProxyAgent(PROXY_URL, {
+  shouldLookup: false // يمنع تسريب الـ DNS للخادم الأجنبي
+});
 
-const INITIAL_COOKIES = [
-  "gsid=31793dad-378b-4b3f-a31d-6830273a78f5",
-  "NetflixId=v%3D3%26ct%3DBgjHlOvcAxKrAsPHtSnrZ9GKORSMuemrTl8covHfrSmMHg1VM44L77Jrwx2uMz07p6sVGf_wgQ347NiE9t-E6u6b1UIjzpLBZj3RK-K12h2a9fOSlqkzKuknBnpr9jq_r_CA258gC-GIMbcVrrpesjVwF_PFBsXdBEvXRpBITMlUtc9t8ZYnmXJhc-UYji_EIctXdNnTV58Q5z2C4uu0_UeYZdSjHfJ7kaWwoiTq4gXly5kgGIL3lYyLGIuI64ektCOwtw56c3xeAxi347qIWa9yUJu98ag5MFObpYDnt7dtyb_t1sWrLejZLVFlmRH3O1tvrGNQ1Gg1YWtu8M2UyONPETTUIk03-XuwOeq38x38W5yhRkQERjLBXMxxfEE2riISV__maFrywZ0aM2XKOy121xIUGAYiDgoMWP4bq858s_MFPNW8",
-  "nfvdid=BQFmAAEBEFG3E8P1gRYF0CWTHucUHvRAr4WoXZoXMCJsHpmZWCwV23Wvz4jL7B_S3wcmhclGbFwicS-7sV38gw0R4uqceBim1JQ-_tiQJZ0wUNES6bl9Yw%3D%3D",
-  "SecureNetflixId=v%3D3%26mac%3DAQEAEQABABQrKG3XWM4a01dvho67JcWEdpgOEh3Iqnw.%26dt%3D1786546366150"
-];
+// ترويسات متصفح Chrome قياسية ومطابقة للواقع لتفادي الحظر الصامت
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "*/*",
+  "Accept-Language": "ar-IQ,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+  "Origin": "https://www.netflix.com",
+  "Referer": "https://www.netflix.com/iq/",
+  "Sec-Fetch-Dest": "empty",
+  "Sec-Fetch-Mode": "cors",
+  "Sec-Fetch-Site": "same-origin",
+  "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+  "x-netflix.context.app-version": "v09ea4ac1",
+  "x-netflix.context.form-factor": "desktop",
+  "x-netflix.context.hawkins-version": "5.26.0",
+  "x-netflix.context.is-inapp-browser": "false",
+  "x-netflix.context.ui-flavor": "akira"
+};
 
-const USER_AGENTS = [
-  "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36",
-  "Mozilla/5.0 (Linux; Android 12; Pixel 6 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36",
-  "Mozilla/5.0 (iPhone; CPU iPhone OS 16_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Mobile/15E148 Safari/604.1",
-  "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36"
-];
-
-// إنشاء جلسة مخصصة تدير الكوكيز والبروكسي بدون تعارض
 class NetflixSession {
   constructor() {
     this.jar = new CookieJar();
-    for (const cookie of INITIAL_COOKIES) {
-      this.jar.setCookieSync(`${cookie}; Domain=.netflix.com; Path=/`, 'https://www.netflix.com');
-    }
-
     this.client = axios.create({
       httpAgent: agent,
       httpsAgent: agent,
@@ -94,60 +98,33 @@ function cleanToken(token) {
   }
 }
 
-function extractFromDict(data) {
+function extractTokens(data) {
   if (data && typeof data === 'object') {
     if (data.serverState && data.serverScreenUpdate) {
       return [cleanToken(data.serverState), cleanToken(data.serverScreenUpdate)];
     }
     if (Array.isArray(data)) {
       for (const item of data) {
-        const [s, sc] = extractFromDict(item);
+        const [s, sc] = extractTokens(item);
         if (s && sc) return [s, sc];
       }
     } else {
       for (const key of Object.keys(data)) {
-        const [s, sc] = extractFromDict(data[key]);
+        const [s, sc] = extractTokens(data[key]);
         if (s && sc) return [s, sc];
       }
     }
   }
-  return [null, null];
-}
-
-function smartExtract(data) {
-  if (typeof data === 'object') {
-    const [s, sc] = extractFromDict(data);
-    if (s && sc) return [s, sc];
-  }
   const text = typeof data === 'string' ? data : JSON.stringify(data);
   const stateMatch = text.match(/"serverState"\s*:\s*"([^"]+)"/);
   const screenMatch = text.match(/"serverScreenUpdate"\s*:\s*"([^"]+)"/);
-  const state = stateMatch ? cleanToken(stateMatch[1]) : null;
-  const screen = screenMatch ? cleanToken(screenMatch[1]) : null;
-  return [state, screen];
-}
-
-function getGhostHeaders() {
-  return {
-    "User-Agent": USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)],
-    "accept": "*/*",
-    "accept-language": "ar-IQ,ar;q=0.9,en-US;q=0.8,en;q=0.7",
-    "origin": "https://www.netflix.com",
-    "x-netflix.context.app-version": "v09ea4ac1",
-    "x-netflix.context.form-factor": "phone",
-    "x-netflix.context.hawkins-version": "5.26.0",
-    "x-netflix.context.is-inapp-browser": "false",
-    "x-netflix.context.ui-flavor": "akira",
-    "x-netflix.request.toplevel.uuid": uuidv4(),
-    "x-netflix.request.id": uuidv4().replace(/-/g, '')
-  };
+  return [stateMatch ? cleanToken(stateMatch[1]) : null, screenMatch ? cleanToken(screenMatch[1]) : null];
 }
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-const humanDelay = () => sleep(Math.floor(Math.random() * 1000) + 1000);
 
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id, "مرحباً يا بطل! 🚀\n\n✉️ أرسل الإيميل الآن لإرسال رابط التسجيل مباشرة.");
+  bot.sendMessage(msg.chat.id, "مرحباً بك! 🚀\n\n✉️ أرسل الإيميل الآن لإرسال رابط التسجيل مباشرة.");
 });
 
 bot.on('message', async (msg) => {
@@ -158,27 +135,38 @@ bot.on('message', async (msg) => {
 
   const email = text;
   const chatId = msg.chat.id;
-  const statusMsg = await bot.sendMessage(chatId, "⏳ جاري إرسال الرابط للإيميل عبر السيرفر...");
+  const statusMsg = await bot.sendMessage(chatId, "⏳ جاري بدء جلسة حقيقية وإرسال الرابط...");
 
   try {
     const session = new NetflixSession();
-    const ghostHeaders = getGhostHeaders();
+    
+    const requestHeaders = {
+      ...BROWSER_HEADERS,
+      "x-netflix.request.toplevel.uuid": uuidv4(),
+      "x-netflix.request.id": uuidv4().replace(/-/g, '')
+    };
 
-    await session.get('https://www.netflix.com/iq/login', { headers: ghostHeaders });
-    const freshFlwssn = await session.getCookieValue('flwssn');
+    // سحب جلسة نظيفة وجديدة بالكامل من السيرفر العراقي مباشرة
+    const initRes = await session.get('https://www.netflix.com/iq/', { headers: requestHeaders });
+    let freshFlwssn = await session.getCookieValue('flwssn');
 
     if (!freshFlwssn) {
-      return bot.editMessageText("❌ فشل سحب تذكرة flwssn. تأكد من اتصال البروكسي.", {
+      await session.get('https://www.netflix.com/iq/login', { headers: requestHeaders });
+      freshFlwssn = await session.getCookieValue('flwssn');
+    }
+
+    if (!freshFlwssn) {
+      return bot.editMessageText("❌ البروكسي لم يستجب بشكل صحيح أو تم حظر الـ IP.", {
         chat_id: chatId,
         message_id: statusMsg.message_id
       });
     }
 
-    await humanDelay();
+    await sleep(1500);
 
-    // الخطوة 1: تهيئة التسجيل
+    // الخطوة 1: تهيئة التسجيل للعنوان العراقي
     const h1 = {
-      ...ghostHeaders,
+      ...requestHeaders,
       "content-type": "application/json",
       "x-netflix.context.operation-name": "CLCSWebInitSignup",
       "x-netflix.request.client.context": '{"appstate":"foreground"}'
@@ -195,7 +183,7 @@ bot.on('message', async (msg) => {
           { name: "countryCode", value: { stringValue: "IQ" } },
           { name: "countryIsoCode", value: { stringValue: "IQ" } },
           { name: "recaptchaError", value: { stringValue: "RESPONSE_TIMED_OUT" } },
-          { name: "recaptchaResponseTime", value: { stringValue: String(Math.floor(Math.random() * (3900 - 2100 + 1)) + 2100) } },
+          { name: "recaptchaResponseTime", value: { stringValue: String(Math.floor(Math.random() * 1500) + 2000) } },
           { name: "recaptchaSiteKey", value: { stringValue: "6LdqW_EqAAAAAO87Fb_kcZfNzs0IqJRcKiJDYpUv" } },
           { name: "recaptchaToken", value: {} }
         ]
@@ -204,19 +192,19 @@ bot.on('message', async (msg) => {
     };
 
     const res1 = await session.post('https://www.netflix.com/graphql', p1, { headers: h1 });
-    const [state1, screen1] = smartExtract(res1.data);
+    const [state1, screen1] = extractTokens(res1.data);
     if (!state1) {
-      return bot.editMessageText(`❌ فشل الخطوة الأولى:\n${JSON.stringify(res1.data).slice(0, 200)}`, {
+      return bot.editMessageText(`❌ خطأ بالتهيئة (1):\n${JSON.stringify(res1.data).slice(0, 200)}`, {
         chat_id: chatId,
         message_id: statusMsg.message_id
       });
     }
 
-    await humanDelay();
+    await sleep(1500);
 
-    // الخطوة 2: طلب إرسال الرابط
+    // الخطوة 2: أمر إرسال الرابط الفعلي
     const h2 = {
-      ...ghostHeaders,
+      ...requestHeaders,
       "content-type": "application/json",
       "x-netflix.context.operation-name": "CLCSScreenUpdate",
       "x-netflix.request.client.context": '{"appView":"emailRegisterSendLink","action":"Submitted","appstate":"foreground"}'
@@ -237,26 +225,26 @@ bot.on('message', async (msg) => {
           { name: "pipcConsent", value: { booleanValue: false } },
           { name: "emailConsent", value: { booleanValue: false } },
           { name: "recaptchaError", value: { stringValue: "RESPONSE_TIMED_OUT" } },
-          { name: "recaptchaResponseTime", value: { intValue: Math.floor(Math.random() * (3900 - 2100 + 1)) + 2100 } }
+          { name: "recaptchaResponseTime", value: { intValue: Math.floor(Math.random() * 1500) + 2000 } }
         ]
       },
       extensions: { persistedQuery: { id: "bf08eba4-da1b-4e3b-92e4-ceb2b7c1c27d", version: 102 } }
     };
 
     const res2 = await session.post('https://www.netflix.com/graphql', p2, { headers: h2 });
-    const [state2, screen2] = smartExtract(res2.data);
+    const [state2, screen2] = extractTokens(res2.data);
     if (!state2) {
-      return bot.editMessageText(`❌ فشل الخطوة الثانية:\n${JSON.stringify(res2.data).slice(0, 200)}`, {
+      return bot.editMessageText(`❌ خطأ بالإرسال (2):\n${JSON.stringify(res2.data).slice(0, 200)}`, {
         chat_id: chatId,
         message_id: statusMsg.message_id
       });
     }
 
-    await humanDelay();
+    await sleep(1500);
 
-    // الخطوة 3: تأكيد إرسال الرابط
+    // الخطوة 3: تأكيد استلام الشاشة (Transition Check)
     const h3 = {
-      ...ghostHeaders,
+      ...requestHeaders,
       "content-type": "application/json",
       "x-netflix.context.operation-name": "CLCSScreenUpdate",
       "x-netflix.request.client.context": '{"appView":"emailRegisterLinkSent","action":"Submitted","appstate":"foreground"}'
@@ -282,14 +270,14 @@ bot.on('message', async (msg) => {
     const res3 = await session.post('https://www.netflix.com/graphql', p3, { headers: h3 });
     const resText = typeof res3.data === 'string' ? res3.data : JSON.stringify(res3.data);
 
-    if (res3.status === 200 && resText.includes('CLCSScreenUpdateTransition')) {
-      bot.editMessageText(`🎉 **تم إرسال الرابط بنجاح!**\n\n📧 الإيميل: \`${email}\`\nافحص صندوق الوارد أو البريد العشوائي (Spam).`, {
+    if (res3.status === 200 && (resText.includes('CLCSScreenUpdateTransition') || resText.includes('emailRegisterLinkSent'))) {
+      bot.editMessageText(`🎉 **تم إرسال الرابط الفعلي!**\n\n📧 الإيميل: \`${email}\`\nراجع صندوق الوارد والـ Spam الآن.`, {
         chat_id: chatId,
         message_id: statusMsg.message_id,
         parse_mode: "Markdown"
       });
     } else {
-      bot.editMessageText(`⚠️ **فشل الإرسال:**\n\`\`\`text\n${resText.slice(0, 300)}\n\`\`\``, {
+      bot.editMessageText(`⚠️ رد غير متوقع من السيرفر:\n\`\`\`text\n${resText.slice(0, 300)}\n\`\`\``, {
         chat_id: chatId,
         message_id: statusMsg.message_id,
         parse_mode: "Markdown"
@@ -297,7 +285,7 @@ bot.on('message', async (msg) => {
     }
 
   } catch (error) {
-    bot.editMessageText(`❌ خطأ:\n${error.message}`, {
+    bot.editMessageText(`❌ خطأ في الاتصال:\n${error.message}`, {
       chat_id: chatId,
       message_id: statusMsg.message_id
     });
