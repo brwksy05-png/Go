@@ -1,11 +1,9 @@
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const { wrapper } = require('axios-cookiejar-support');
 const { CookieJar } = require('tough-cookie');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { v4: uuidv4 } = require('uuid');
 
-// جلب التوكن من متغيرات البيئة في Railway
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 if (!BOT_TOKEN) {
@@ -15,7 +13,6 @@ if (!BOT_TOKEN) {
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// إعدادات البروكسي العراقي (يمكن تعيينه كمتغير بيئة PROXY_URL أو استخدام الافتراضي)
 const PROXY_URL = process.env.PROXY_URL || "socks5://14a960b9eca06:21dd78f1a2@181.215.144.223:12324";
 const agent = new SocksProxyAgent(PROXY_URL);
 
@@ -32,6 +29,60 @@ const USER_AGENTS = [
   "Mozilla/5.0 (iPhone; CPU iPhone OS 16_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Mobile/15E148 Safari/604.1",
   "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36"
 ];
+
+// إنشاء جلسة مخصصة تدير الكوكيز والبروكسي بدون تعارض
+class NetflixSession {
+  constructor() {
+    this.jar = new CookieJar();
+    for (const cookie of INITIAL_COOKIES) {
+      this.jar.setCookieSync(`${cookie}; Domain=.netflix.com; Path=/`, 'https://www.netflix.com');
+    }
+
+    this.client = axios.create({
+      httpAgent: agent,
+      httpsAgent: agent,
+      timeout: 25000,
+      validateStatus: () => true
+    });
+
+    this.client.interceptors.request.use(async (config) => {
+      const url = config.url.startsWith('http') ? config.url : `https://www.netflix.com${config.url}`;
+      const cookieStr = await this.jar.getCookieString(url);
+      if (cookieStr) {
+        config.headers['Cookie'] = cookieStr;
+      }
+      return config;
+    });
+
+    this.client.interceptors.response.use(async (response) => {
+      const setCookies = response.headers['set-cookie'];
+      if (setCookies) {
+        const cookies = Array.isArray(setCookies) ? setCookies : [setCookies];
+        const url = response.config.url.startsWith('http') ? response.config.url : `https://www.netflix.com${response.config.url}`;
+        for (const c of cookies) {
+          try {
+            await this.jar.setCookie(c, url);
+          } catch (e) {}
+        }
+      }
+      return response;
+    });
+  }
+
+  async get(url, options = {}) {
+    return this.client.get(url, options);
+  }
+
+  async post(url, data, options = {}) {
+    return this.client.post(url, data, options);
+  }
+
+  async getCookieValue(key) {
+    const cookies = await this.jar.getCookies('https://www.netflix.com');
+    const target = cookies.find(c => c.key === key);
+    return target ? target.value : null;
+  }
+}
 
 function cleanToken(token) {
   if (!token) return null;
@@ -95,20 +146,6 @@ function getGhostHeaders() {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const humanDelay = () => sleep(Math.floor(Math.random() * 1000) + 1000);
 
-async function createConfiguredSession() {
-  const jar = new CookieJar();
-  for (const cookie of INITIAL_COOKIES) {
-    await jar.setCookie(`${cookie}; Domain=.netflix.com; Path=/`, 'https://www.netflix.com');
-  }
-  
-  return wrapper(axios.create({
-    jar,
-    httpAgent: agent,
-    httpsAgent: agent,
-    timeout: 25000
-  }));
-}
-
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id, "مرحباً يا بطل! 🚀\n\n✉️ أرسل الإيميل الآن لإرسال رابط التسجيل مباشرة.");
 });
@@ -124,14 +161,11 @@ bot.on('message', async (msg) => {
   const statusMsg = await bot.sendMessage(chatId, "⏳ جاري إرسال الرابط للإيميل عبر السيرفر...");
 
   try {
-    const session = await createConfiguredSession();
+    const session = new NetflixSession();
     const ghostHeaders = getGhostHeaders();
 
     await session.get('https://www.netflix.com/iq/login', { headers: ghostHeaders });
-    
-    const cookies = await session.defaults.jar.getCookies('https://www.netflix.com');
-    const flwssnCookie = cookies.find(c => c.key === 'flwssn');
-    const freshFlwssn = flwssnCookie ? flwssnCookie.value : null;
+    const freshFlwssn = await session.getCookieValue('flwssn');
 
     if (!freshFlwssn) {
       return bot.editMessageText("❌ فشل سحب تذكرة flwssn. تأكد من اتصال البروكسي.", {
@@ -220,7 +254,7 @@ bot.on('message', async (msg) => {
 
     await humanDelay();
 
-    // الخطوة 3: تأكيد الإرسال
+    // الخطوة 3: تأكيد إرسال الرابط
     const h3 = {
       ...ghostHeaders,
       "content-type": "application/json",
