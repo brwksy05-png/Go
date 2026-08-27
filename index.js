@@ -1,7 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const { CookieJar } = require('tough-cookie');
-const { SocksProxyAgent } = require('socks-proxy-agent');
 const { v4: uuidv4 } = require('uuid');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -13,11 +12,7 @@ if (!BOT_TOKEN) {
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// إعدادات البروكسي
-const PROXY_URL = process.env.PROXY_URL || "socks5://14a960b9eca06:21dd78f1a2@181.215.144.223:12324";
-const agent = new SocksProxyAgent(PROXY_URL, { shouldLookup: false });
-
-// كوكيز الهوية الأساسية (لتجاوز تدقيق البوتات)
+// كوكيز أساسية لإنعاش الجلسة
 const BASE_COOKIES = [
   "gsid=31793dad-378b-4b3f-a31d-6830273a78f5",
   "nfvdid=BQFmAAEBEFG3E8P1gRYF0CWTHucUHvRAr4WoXZoXMCJsHpmZWCwV23Wvz4jL7B_S3wcmhclGbFwicS-7sV38gw0R4uqceBim1JQ-_tiQJZ0wUNES6bl9Yw%3D%3D"
@@ -49,9 +44,8 @@ class NetflixSession {
       this.jar.setCookieSync(`${c}; Domain=.netflix.com; Path=/`, 'https://www.netflix.com');
     }
 
+    // اتصال مباشر بدون أجهزة وسيطة
     this.client = axios.create({
-      httpAgent: agent,
-      httpsAgent: agent,
       timeout: 25000,
       validateStatus: () => true
     });
@@ -118,7 +112,7 @@ function extractTokens(data) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id, "مرحباً بك! 🚀\n\n✉️ أرسل الإيميل الآن لإرسال رابط التسجيل مباشرة.");
+  bot.sendMessage(msg.chat.id, "مرحباً يا بطل! 🚀\n\n✉️ أرسل الإيميل الآن لإرسال رابط التسجيل مباشرة (اتصال مباشر).");
 });
 
 bot.on('message', async (msg) => {
@@ -129,7 +123,7 @@ bot.on('message', async (msg) => {
 
   const email = text;
   const chatId = msg.chat.id;
-  const statusMsg = await bot.sendMessage(chatId, "⏳ جاري بدء الجلسة وتنفيذ الطلب...");
+  const statusMsg = await bot.sendMessage(chatId, "⏳ جاري إرسال الطلب باتصال مباشر...");
 
   try {
     const session = new NetflixSession();
@@ -139,7 +133,7 @@ bot.on('message', async (msg) => {
       "x-netflix.request.id": uuidv4().replace(/-/g, '')
     };
 
-    // 1. فتح الصفحة وسحب flwssn نظيف
+    // 1. فتح الصفحة وسحب تذكرة جديدة
     await session.get('https://www.netflix.com/iq/', { headers: reqHeaders });
     let freshFlwssn = await session.getCookieValue('flwssn');
 
@@ -149,15 +143,15 @@ bot.on('message', async (msg) => {
     }
 
     if (!freshFlwssn) {
-      return bot.editMessageText("❌ البروكسي لم يستجب لتذكرة flwssn.", {
+      return bot.editMessageText("❌ السيرفر لم يرجع تذكرة flwssn (قد يكون الـ IP محظور بالكامل).", {
         chat_id: chatId,
         message_id: statusMsg.message_id
       });
     }
 
-    await sleep(1500);
+    await sleep(1200);
 
-    // 2. المرحلة الأولى: InitSignup
+    // 2. تهيئة عملية التسجيل (InitSignup)
     const h1 = {
       ...reqHeaders,
       "content-type": "application/json",
@@ -176,7 +170,7 @@ bot.on('message', async (msg) => {
           { name: "countryCode", value: { stringValue: "IQ" } },
           { name: "countryIsoCode", value: { stringValue: "IQ" } },
           { name: "recaptchaError", value: { stringValue: "RESPONSE_TIMED_OUT" } },
-          { name: "recaptchaResponseTime", value: { stringValue: String(Math.floor(Math.random() * 1000) + 2200) } },
+          { name: "recaptchaResponseTime", value: { stringValue: String(Math.floor(Math.random() * 1000) + 2000) } },
           { name: "recaptchaSiteKey", value: { stringValue: "6LdqW_EqAAAAAO87Fb_kcZfNzs0IqJRcKiJDYpUv" } },
           { name: "recaptchaToken", value: {} }
         ]
@@ -186,16 +180,18 @@ bot.on('message', async (msg) => {
 
     const res1 = await session.post('https://www.netflix.com/graphql', p1, { headers: h1 });
     const [state1, screen1] = extractTokens(res1.data);
+    
     if (!state1) {
-      return bot.editMessageText(`❌ فشل في المرحلة 1:\n${JSON.stringify(res1.data).slice(0, 250)}`, {
+      return bot.editMessageText(`❌ فشل في الخطوة 1:\n\`\`\`json\n${JSON.stringify(res1.data).slice(0, 250)}\n\`\`\``, {
         chat_id: chatId,
-        message_id: statusMsg.message_id
+        message_id: statusMsg.message_id,
+        parse_mode: "Markdown"
       });
     }
 
-    await sleep(1500);
+    await sleep(1200);
 
-    // 3. المرحلة الثانية: SendLink
+    // 3. طلب إرسال الرابط (emailRegisterSendLink)
     const h2 = {
       ...reqHeaders,
       "content-type": "application/json",
@@ -218,7 +214,7 @@ bot.on('message', async (msg) => {
           { name: "pipcConsent", value: { booleanValue: false } },
           { name: "emailConsent", value: { booleanValue: false } },
           { name: "recaptchaError", value: { stringValue: "RESPONSE_TIMED_OUT" } },
-          { name: "recaptchaResponseTime", value: { intValue: Math.floor(Math.random() * 1000) + 2200 } }
+          { name: "recaptchaResponseTime", value: { intValue: Math.floor(Math.random() * 1000) + 2000 } }
         ]
       },
       extensions: { persistedQuery: { id: "bf08eba4-da1b-4e3b-92e4-ceb2b7c1c27d", version: 102 } }
@@ -226,16 +222,18 @@ bot.on('message', async (msg) => {
 
     const res2 = await session.post('https://www.netflix.com/graphql', p2, { headers: h2 });
     const [state2, screen2] = extractTokens(res2.data);
+
     if (!state2) {
-      return bot.editMessageText(`❌ فشل في المرحلة 2:\n${JSON.stringify(res2.data).slice(0, 250)}`, {
+      return bot.editMessageText(`❌ فشل في الخطوة 2:\n\`\`\`json\n${JSON.stringify(res2.data).slice(0, 250)}\n\`\`\``, {
         chat_id: chatId,
-        message_id: statusMsg.message_id
+        message_id: statusMsg.message_id,
+        parse_mode: "Markdown"
       });
     }
 
-    await sleep(1500);
+    await sleep(1200);
 
-    // 4. المرحلة الثالثة: تأكيد إرسال الرابط (LinkSent)
+    // 4. تأكيد وصول الشاشة
     const h3 = {
       ...reqHeaders,
       "content-type": "application/json",
@@ -264,7 +262,7 @@ bot.on('message', async (msg) => {
     const resRaw = JSON.stringify(res3.data || {});
 
     if (resRaw.includes('CLCSScreenUpdateTransition') || resRaw.includes('emailRegisterLinkSent')) {
-      bot.editMessageText(`🎉 **تم طلب الإرسال بنجاح!**\n\n📧 الإيميل: \`${email}\`\n\n⚠️ **ملاحظة:** إذا تأخر وصول البريد، فسبب ذلك أن الـ IP المستخدم في البروكسي محظور بريدياً ويجب تغييره ببروكسي سكني نظيف.`, {
+      bot.editMessageText(`🎉 **تم طلب الإرسال المباشر!**\n\n📧 الإيميل: \`${email}\`\n\n📌 الرد النهائي:\n\`\`\`json\n${resRaw.slice(0, 250)}\n\`\`\``, {
         chat_id: chatId,
         message_id: statusMsg.message_id,
         parse_mode: "Markdown"
@@ -278,7 +276,7 @@ bot.on('message', async (msg) => {
     }
 
   } catch (error) {
-    bot.editMessageText(`❌ خطأ:\n${error.message}`, {
+    bot.editMessageText(`❌ خطأ أثناء الاتصال:\n${error.message}`, {
       chat_id: chatId,
       message_id: statusMsg.message_id
     });

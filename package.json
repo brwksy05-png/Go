@@ -1,7 +1,7 @@
 {
   "name": "netflix-signup-bot",
   "version": "1.0.0",
-  "description": "Netflix Email Registration Bot",
+  "description": "Netflix Email Registration Bot (Direct Connection)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,7 +9,6 @@
   "dependencies": {
     "axios": "^1.7.9",
     "node-telegram-bot-api": "^0.66.0",
-    "socks-proxy-agent": "^8.0.5",
     "tough-cookie": "^5.1.1",
     "uuid": "^11.0.5"
   }
