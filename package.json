@@ -1,7 +1,7 @@
 {
   "name": "netflix-signup-bot",
   "version": "1.0.0",
-  "description": "Telegram bot for Netflix signup link automation",
+  "description": "Netflix Email Registration Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"

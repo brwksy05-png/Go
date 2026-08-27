@@ -7,21 +7,21 @@ const { v4: uuidv4 } = require('uuid');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 if (!BOT_TOKEN) {
-  console.error("❌ خطأ: يرجى ضبط المتغير BOT_TOKEN في إعدادات Railway");
+  console.error("❌ خطأ: يرجى إضافة BOT_TOKEN في Variables داخل منصة Railway!");
   process.exit(1);
 }
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// إعداد البروكسي العراقي مع إجبار حل الـ DNS داخل السيرفر
+// إعداد البروكسي العراقي
 const PROXY_URL = process.env.PROXY_URL || "socks5://14a960b9eca06:21dd78f1a2@181.215.144.223:12324";
 const agent = new SocksProxyAgent(PROXY_URL, {
-  shouldLookup: false // يمنع تسريب الـ DNS للخادم الأجنبي
+  shouldLookup: false
 });
 
-// ترويسات متصفح Chrome قياسية ومطابقة للواقع لتفادي الحظر الصامت
-const BROWSER_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+// ترويسات متصفح Chrome حقيقية
+const REAL_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
   "Accept": "*/*",
   "Accept-Language": "ar-IQ,ar;q=0.9,en-US;q=0.8,en;q=0.7",
   "Origin": "https://www.netflix.com",
@@ -29,7 +29,7 @@ const BROWSER_HEADERS = {
   "Sec-Fetch-Dest": "empty",
   "Sec-Fetch-Mode": "cors",
   "Sec-Fetch-Site": "same-origin",
-  "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+  "sec-ch-ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
   "sec-ch-ua-mobile": "?0",
   "sec-ch-ua-platform": '"Windows"',
   "x-netflix.context.app-version": "v09ea4ac1",
@@ -124,7 +124,7 @@ function extractTokens(data) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id, "مرحباً بك! 🚀\n\n✉️ أرسل الإيميل الآن لإرسال رابط التسجيل مباشرة.");
+  bot.sendMessage(msg.chat.id, "مرحباً يا بطل! 🚀\n\n✉️ أرسل الإيميل الآن لبدء إرسال الرابط.");
 });
 
 bot.on('message', async (msg) => {
@@ -135,28 +135,29 @@ bot.on('message', async (msg) => {
 
   const email = text;
   const chatId = msg.chat.id;
-  const statusMsg = await bot.sendMessage(chatId, "⏳ جاري بدء جلسة حقيقية وإرسال الرابط...");
+  const statusMsg = await bot.sendMessage(chatId, "⏳ جاري بدء الاتصال عبر البروكسي...");
 
   try {
     const session = new NetflixSession();
-    
-    const requestHeaders = {
-      ...BROWSER_HEADERS,
+    const reqHeaders = {
+      ...REAL_HEADERS,
       "x-netflix.request.toplevel.uuid": uuidv4(),
       "x-netflix.request.id": uuidv4().replace(/-/g, '')
     };
 
-    // سحب جلسة نظيفة وجديدة بالكامل من السيرفر العراقي مباشرة
-    const initRes = await session.get('https://www.netflix.com/iq/', { headers: requestHeaders });
+    // 1. فتح الصفحة الرئيسية لجلب كوكيز نظيفة وجديدة بالكامل
+    console.log(`[+] بدء جلسة جديدة للإيميل: ${email}`);
+    await session.get('https://www.netflix.com/iq/', { headers: reqHeaders });
+    
     let freshFlwssn = await session.getCookieValue('flwssn');
-
     if (!freshFlwssn) {
-      await session.get('https://www.netflix.com/iq/login', { headers: requestHeaders });
+      await session.get('https://www.netflix.com/iq/login', { headers: reqHeaders });
       freshFlwssn = await session.getCookieValue('flwssn');
     }
 
     if (!freshFlwssn) {
-      return bot.editMessageText("❌ البروكسي لم يستجب بشكل صحيح أو تم حظر الـ IP.", {
+      console.error("[-] فشل في سحب تذكرة flwssn");
+      return bot.editMessageText("❌ البروكسي لم يستجب أو تم حظر الـ IP من نتفليكس.", {
         chat_id: chatId,
         message_id: statusMsg.message_id
       });
@@ -164,9 +165,9 @@ bot.on('message', async (msg) => {
 
     await sleep(1500);
 
-    // الخطوة 1: تهيئة التسجيل للعنوان العراقي
+    // 2. تهيئة التسجيل (InitSignup)
     const h1 = {
-      ...requestHeaders,
+      ...reqHeaders,
       "content-type": "application/json",
       "x-netflix.context.operation-name": "CLCSWebInitSignup",
       "x-netflix.request.client.context": '{"appstate":"foreground"}'
@@ -183,7 +184,7 @@ bot.on('message', async (msg) => {
           { name: "countryCode", value: { stringValue: "IQ" } },
           { name: "countryIsoCode", value: { stringValue: "IQ" } },
           { name: "recaptchaError", value: { stringValue: "RESPONSE_TIMED_OUT" } },
-          { name: "recaptchaResponseTime", value: { stringValue: String(Math.floor(Math.random() * 1500) + 2000) } },
+          { name: "recaptchaResponseTime", value: { stringValue: String(Math.floor(Math.random() * 1000) + 2000) } },
           { name: "recaptchaSiteKey", value: { stringValue: "6LdqW_EqAAAAAO87Fb_kcZfNzs0IqJRcKiJDYpUv" } },
           { name: "recaptchaToken", value: {} }
         ]
@@ -193,18 +194,21 @@ bot.on('message', async (msg) => {
 
     const res1 = await session.post('https://www.netflix.com/graphql', p1, { headers: h1 });
     const [state1, screen1] = extractTokens(res1.data);
+    
+    console.log("[1] WebInitSignup State:", state1 ? "OK" : "FAILED");
     if (!state1) {
-      return bot.editMessageText(`❌ خطأ بالتهيئة (1):\n${JSON.stringify(res1.data).slice(0, 200)}`, {
+      return bot.editMessageText(`❌ فشل في المرحلة 1:\n\`\`\`json\n${JSON.stringify(res1.data).slice(0, 300)}\n\`\`\``, {
         chat_id: chatId,
-        message_id: statusMsg.message_id
+        message_id: statusMsg.message_id,
+        parse_mode: "Markdown"
       });
     }
 
     await sleep(1500);
 
-    // الخطوة 2: أمر إرسال الرابط الفعلي
+    // 3. طلب إرسال الرابط (emailRegisterSendLink)
     const h2 = {
-      ...requestHeaders,
+      ...reqHeaders,
       "content-type": "application/json",
       "x-netflix.context.operation-name": "CLCSScreenUpdate",
       "x-netflix.request.client.context": '{"appView":"emailRegisterSendLink","action":"Submitted","appstate":"foreground"}'
@@ -225,7 +229,7 @@ bot.on('message', async (msg) => {
           { name: "pipcConsent", value: { booleanValue: false } },
           { name: "emailConsent", value: { booleanValue: false } },
           { name: "recaptchaError", value: { stringValue: "RESPONSE_TIMED_OUT" } },
-          { name: "recaptchaResponseTime", value: { intValue: Math.floor(Math.random() * 1500) + 2000 } }
+          { name: "recaptchaResponseTime", value: { intValue: Math.floor(Math.random() * 1000) + 2000 } }
         ]
       },
       extensions: { persistedQuery: { id: "bf08eba4-da1b-4e3b-92e4-ceb2b7c1c27d", version: 102 } }
@@ -233,18 +237,21 @@ bot.on('message', async (msg) => {
 
     const res2 = await session.post('https://www.netflix.com/graphql', p2, { headers: h2 });
     const [state2, screen2] = extractTokens(res2.data);
+    
+    console.log("[2] emailRegisterSendLink State:", state2 ? "OK" : "FAILED");
     if (!state2) {
-      return bot.editMessageText(`❌ خطأ بالإرسال (2):\n${JSON.stringify(res2.data).slice(0, 200)}`, {
+      return bot.editMessageText(`❌ فشل في المرحلة 2:\n\`\`\`json\n${JSON.stringify(res2.data).slice(0, 300)}\n\`\`\``, {
         chat_id: chatId,
-        message_id: statusMsg.message_id
+        message_id: statusMsg.message_id,
+        parse_mode: "Markdown"
       });
     }
 
     await sleep(1500);
 
-    // الخطوة 3: تأكيد استلام الشاشة (Transition Check)
+    // 4. تأكيد وصول شاشة الرابط المرسل (emailRegisterLinkSent)
     const h3 = {
-      ...requestHeaders,
+      ...reqHeaders,
       "content-type": "application/json",
       "x-netflix.context.operation-name": "CLCSScreenUpdate",
       "x-netflix.request.client.context": '{"appView":"emailRegisterLinkSent","action":"Submitted","appstate":"foreground"}'
@@ -268,16 +275,18 @@ bot.on('message', async (msg) => {
     };
 
     const res3 = await session.post('https://www.netflix.com/graphql', p3, { headers: h3 });
-    const resText = typeof res3.data === 'string' ? res3.data : JSON.stringify(res3.data);
+    const resRaw = JSON.stringify(res3.data || {});
+    console.log("[3] Final Response:", resRaw);
 
-    if (res3.status === 200 && (resText.includes('CLCSScreenUpdateTransition') || resText.includes('emailRegisterLinkSent'))) {
-      bot.editMessageText(`🎉 **تم إرسال الرابط الفعلي!**\n\n📧 الإيميل: \`${email}\`\nراجع صندوق الوارد والـ Spam الآن.`, {
+    // فحص دقيق: هل وافقت نتفليكس على شاشة الانتقال أم تطلب كابتشا/تحقق؟
+    if (resRaw.includes('CLCSScreenUpdateTransition') || resRaw.includes('emailRegisterLinkSent') || resRaw.includes('serverScreenUpdate')) {
+      bot.editMessageText(`🎉 **تم طلب إرسال الرابط!**\n\n📧 الإيميل: \`${email}\`\n\n📌 رد السيرفر:\n\`\`\`json\n${resRaw.slice(0, 250)}\n\`\`\``, {
         chat_id: chatId,
         message_id: statusMsg.message_id,
         parse_mode: "Markdown"
       });
     } else {
-      bot.editMessageText(`⚠️ رد غير متوقع من السيرفر:\n\`\`\`text\n${resText.slice(0, 300)}\n\`\`\``, {
+      bot.editMessageText(`⚠️ **حظر الحماية:** نتفليكس أسقطت الطلب.\n\`\`\`json\n${resRaw.slice(0, 300)}\n\`\`\``, {
         chat_id: chatId,
         message_id: statusMsg.message_id,
         parse_mode: "Markdown"
@@ -285,7 +294,8 @@ bot.on('message', async (msg) => {
     }
 
   } catch (error) {
-    bot.editMessageText(`❌ خطأ في الاتصال:\n${error.message}`, {
+    console.error("[-] Error:", error.message);
+    bot.editMessageText(`❌ خطأ في التنفيذ:\n${error.message}`, {
       chat_id: chatId,
       message_id: statusMsg.message_id
     });
