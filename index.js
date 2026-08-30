@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const { SocksProxyAgent } = require('socks-proxy-agent');
-const HttpsProxyAgent = require('https-proxy-agent');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const { v4: uuidv4 } = require('uuid');
 
 // ==========================================
@@ -28,12 +28,10 @@ const USER_AGENTS = [
 
 const SERVICE_NETFLIX = "nf";
 const COUNTRY_IRAQ = "47";
-
-http_session = requests = require('axios'); // Note: handled via axios wrapper or instances below
 const httpAgent = new HttpsProxyAgent(PROXIES.http);
 
 // ==========================================
-// إعدادات البوتات والمستخدمين (مرتبطة بمتغيرات البيئة الجديدة)
+// إعدادات البوتات والمستخدمين (مرتبطة بمتغيرات البيئة)
 // ==========================================
 let BOTS_CONFIG = [
     {
@@ -396,9 +394,6 @@ class SingleBotHandler {
         return { reply_markup: { inline_keyboard: inlineKeyboard } };
     }
 
-    // ==========================================
-    // إرسال رابط نتفلكس إلى الإيميل
-    // ==========================================
     async _handleEmailSubmission(message) {
         let email = message.text.trim();
         let chatId = message.chat.id;
@@ -414,14 +409,12 @@ class SingleBotHandler {
             let ghostHeaders = getGhostHeaders();
 
             let respInit = await client.get('https://www.netflix.com/iq/login', { headers: ghostHeaders });
-            // Simulate cookie fetching or grab from headers if needed, using safe default
             let freshFlwssn = uuidv4();
             let match = respInit.data.match(/"flwssn"\s*:\s*"([^"]+)"/);
             if (match) freshFlwssn = match[1];
 
             await humanDelay(1.0, 2.0);
 
-            // [1] CLCSWebInitSignup
             let h1 = { ...ghostHeaders, "content-type": "application/json", "x-netflix.context.operation-name": "CLCSWebInitSignup", "x-netflix.request.client.context": '{"appstate":"foreground"}' };
             let p1 = {
                 "operationName": "CLCSWebInitSignup", 
@@ -451,7 +444,6 @@ class SingleBotHandler {
 
             await humanDelay(1.2, 2.2);
 
-            // [2] CLCSScreenUpdate
             let h2 = { ...ghostHeaders, "content-type": "application/json", "x-netflix.context.operation-name": "CLCSScreenUpdate", "x-netflix.request.client.context": '{"appView":"emailRegisterSendLink","action":"Submitted","appstate":"foreground"}' };
             let p2 = {
                 "operationName": "CLCSScreenUpdate", 
@@ -493,9 +485,6 @@ class SingleBotHandler {
         }
     }
 
-    // ==========================================
-    // المسار الذهبي المتسلسل
-    // ==========================================
     async _execute_golden_path(message, magic_link) {
         let phone_number = message.text.trim();
         let chatId = message.chat.id;
@@ -511,10 +500,9 @@ class SingleBotHandler {
             });
             let ghostHeaders = getGhostHeaders();
 
-            // [0] فتح الرابط
             await this.bot.editMessageText("🔄 1/7: فتح الرابط السحري...", { chat_id: chatId, message_id: msgStatus.message_id });
             let res0 = await client.get(magic_link, { headers: ghostHeaders });
-            let flwssn = uuidv4(); // fallback
+            let flwssn = uuidv4();
 
             let [state0, screen0] = smartExtract(JSON.stringify(res0.data));
             if (!state0 && res0.request && res0.request.res && res0.request.res.responseUrl && res0.request.res.responseUrl.includes("serverState=")) {
@@ -531,7 +519,6 @@ class SingleBotHandler {
 
             await humanDelay();
 
-            // [1] PASSWORDLESS_REGISTRATION
             await this.bot.editMessageText("🔄 2/7: تأكيد التسجيل...", { chat_id: chatId, message_id: msgStatus.message_id });
             let h1 = { ...ghostHeaders, "content-type": "application/json", "x-netflix.context.operation-name": "CLCSScreenUpdate", "x-netflix.request.client.context": '{"appView":"PASSWORDLESS_REGISTRATION","action":"Submitted","appstate":"foreground"}' };
             let p1 = {"operationName": "CLCSScreenUpdate", "variables": {"format": "HTML", "imageFormat": "PNG", "locale": "ar-IQ", "serverState": state0, "serverScreenUpdate": screen0, "inputFields": []}, "extensions": {"persistedQuery": {"id": "bf08eba4-da1b-4e3b-92e4-ceb2b7c1c27d", "version": 102}}};
@@ -539,7 +526,6 @@ class SingleBotHandler {
 
             await humanDelay();
 
-            // [2] CLCSWebInitSignup
             await this.bot.editMessageText("🔄 3/7: تهيئة الخطة (InitSignup)...", { chat_id: chatId, message_id: msgStatus.message_id });
             let h2 = { ...ghostHeaders, "content-type": "application/json", "x-netflix.context.operation-name": "CLCSWebInitSignup", "x-netflix.request.client.context": '{"appstate":"foreground"}' };
             let p2 = {"operationName": "CLCSWebInitSignup", "variables": {"inputNode": "WELCOME", "locale": "ar-IQ", "inputFields": [{"name": "flwssn", "value": {"stringValue": flwssn}}]}, "extensions": {"persistedQuery": {"id": "59134b11-7416-42ca-abb7-6d1f318975fe", "version": 102}}};
@@ -552,7 +538,6 @@ class SingleBotHandler {
 
             await humanDelay();
 
-            // [3] planSelectionContext
             await this.bot.editMessageText("🔄 4/7: المرور ببوابة سياق الخطة...", { chat_id: chatId, message_id: msgStatus.message_id });
             let h3 = { ...ghostHeaders, "content-type": "application/json", "x-netflix.context.operation-name": "CLCSScreenUpdate", "x-netflix.request.client.context": '{"appView":"planSelectionContext","action":"Submitted","appstate":"foreground"}' };
             let p3 = {"operationName": "CLCSScreenUpdate", "variables": {"format": "HTML", "imageFormat": "PNG", "locale": "ar-IQ", "serverState": state2, "serverScreenUpdate": screen2, "inputFields": []}, "extensions": {"persistedQuery": {"id": "bf08eba4-da1b-4e3b-92e4-ceb2b7c1c27d", "version": 102}}};
@@ -565,7 +550,6 @@ class SingleBotHandler {
 
             await humanDelay();
 
-            // [4] planSelection (3108)
             await this.bot.editMessageText("🔄 5/7: اختيار الخطة 3108...", { chat_id: chatId, message_id: msgStatus.message_id });
             let h4 = { ...ghostHeaders, "content-type": "application/json", "x-netflix.context.operation-name": "CLCSScreenUpdate", "x-netflix.request.client.context": '{"appView":"planSelection","action":"Submitted","appstate":"foreground"}' };
             let p4 = {"operationName": "CLCSScreenUpdate", "variables": {"format": "HTML", "imageFormat": "PNG", "locale": "ar-IQ", "serverState": state3, "serverScreenUpdate": screen3, "inputFields": [{"name": "planChoice", "value": {"stringValue": "3108"}}]}, "extensions": {"persistedQuery": {"id": "bf08eba4-da1b-4e3b-92e4-ceb2b7c1c27d", "version": 102}}};
@@ -578,7 +562,6 @@ class SingleBotHandler {
 
             await humanDelay();
 
-            // [5] paymentPicker
             await this.bot.editMessageText("🔄 6/7: المرور ببوابة اختيار الدفع...", { chat_id: chatId, message_id: msgStatus.message_id });
             let h5 = { ...ghostHeaders, "content-type": "application/json", "x-netflix.context.operation-name": "CLCSScreenUpdate", "x-netflix.request.client.context": '{"appView":"paymentPicker","action":"Submitted","appstate":"foreground"}' };
             let p5 = {"operationName": "CLCSScreenUpdate", "variables": {"format": "HTML", "imageFormat": "PNG", "locale": "ar-IQ", "serverState": state4, "serverScreenUpdate": screen4, "inputFields": []}, "extensions": {"persistedQuery": {"id": "bf08eba4-da1b-4e3b-92e4-ceb2b7c1c27d", "version": 102}}};
@@ -591,7 +574,6 @@ class SingleBotHandler {
 
             await humanDelay();
 
-            // [6] ENTER_DCB
             await this.bot.editMessageText("📲 7/7: حقن الرقم وإرسال الكود...", { chat_id: chatId, message_id: msgStatus.message_id });
             let h6 = { ...ghostHeaders, "content-type": "application/json", "x-netflix.context.operation-name": "CLCSScreenUpdate", "x-netflix.request.client.context": '{"appView":"ENTER_DCB","action":"Submitted","appstate":"foreground"}' };
             let p6 = {"operationName": "CLCSScreenUpdate", "variables": {"format": "HTML", "imageFormat": "PNG", "locale": "ar-IQ", "serverState": state5, "serverScreenUpdate": screen5, "inputFields": [{"name": "phoneNumber", "value": {"stringValue": phone_number}}, {"name": "countryCode", "value": {"stringValue": "IQ"}}, {"name": "countryIsoCode", "value": {"stringValue": "IQ"}}, {"name": "paymentSubtype", "value": {"stringValue": "NA"}}, {"name": "partnerIntegrationUrl", "value": {"stringValue": "https://www.netflix.com/signup?serverCallback={serverCallback}"}}, {"name": "iAgree", "value": {"booleanValue": true}}]}, "extensions": {"persistedQuery": {"id": "bf08eba4-da1b-4e3b-92e4-ceb2b7c1c27d", "version": 102}}};
@@ -601,9 +583,7 @@ class SingleBotHandler {
             if (res6.status === 200 && res6Text.includes('PAYMENTS_MFA_ENTER_CODE')) {
                 let [state6, screen6] = smartExtract(res6Text);
                 this.userSessions[chatId] = { "client": client, "headers": ghostHeaders, "state": state6, "screen": screen6 };
-                let msg = await this.bot.sendMessage(chatId, `🎯 **تم إرسال الـ SMS بنجاح!**\nالرقم: \`+964${phone_number}\`\n\n💬 أرسل الكود (OTP):`, { parse_mode: "Markdown" });
-                
-                // State tracker for OTP next step
+                await this.bot.sendMessage(chatId, `🎯 **تم إرسال الـ SMS بنجاح!**\nالرقم: \`+964${phone_number}\`\n\n💬 أرسل الكود (OTP):`, { parse_mode: "Markdown" });
                 this.userStates[chatId] = "waiting_for_otp";
             } else {
                 await this.bot.editMessageText(`❌ **الضربة الأخيرة فشلت.** الرد:\n\`\`\`text\n${res6Text.substring(0, 500)}\n\`\`\``, { chat_id: chatId, message_id: msgStatus.message_id, parse_mode: "Markdown" });
@@ -614,9 +594,6 @@ class SingleBotHandler {
         }
     }
 
-    // ==========================================
-    // إرسال الكود OTP
-    // ==========================================
     async _processOtp(message) {
         let otpCode = message.text.trim();
         let chatId = message.chat.id;
@@ -648,9 +625,6 @@ class SingleBotHandler {
         }
     }
 
-    // ==========================================
-    // عمليات شراء وفحص الأرقام
-    // ==========================================
     async _buyNumberAutoFailover(chatId, startPrice, timeoutSeconds = 5, autoFailover = true, allowAsia = false) {
         let prov = this._getProvider(chatId);
 
@@ -861,9 +835,6 @@ class SingleBotHandler {
         }
     }
 
-    // ==========================================
-    // إعدادات المعالجات (Handlers)
-    // ==========================================
     _setupHandlers() {
         this.bot.onText(/\/start|\/menu/, async (msg) => {
             let chatId = msg.chat.id;
@@ -891,7 +862,6 @@ class SingleBotHandler {
 
             if (text.startsWith('/')) return;
 
-            // Handle waiting for OTP state
             if (this.userStates[chatId] === "waiting_for_otp") {
                 await this._processOtp(msg);
                 return;
@@ -899,7 +869,6 @@ class SingleBotHandler {
 
             if (text.includes("netflix.com/epr")) {
                 await this.bot.reply_to(msg, "✅ تم التقاط الرابط بنجاح!\n\n📱 أرسل رقم هاتفك العراقي (بدون صفر، مثال: 7701234567):");
-                // Temporary listener or custom state flow
                 this.userStates[chatId] = { step: "waiting_for_phone", magic_link: text };
                 return;
             }
