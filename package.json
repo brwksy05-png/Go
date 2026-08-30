@@ -2,7 +2,7 @@
   "name": "netflix-telegram-bot",
   "version": "1.0.0",
   "description": "Multi-bot automation for Netflix & SMS",
-  "main": "bot.js",
+  "main": "index.js",
   "scripts": {
     "start": "node bot.js"
   },
