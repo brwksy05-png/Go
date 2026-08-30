@@ -38,43 +38,73 @@ const SERVICE_NETFLIX = "nf";
 const COUNTRY_IRAQ = "47";
 
 // ==========================================
-// قراءة إعدادات البوتات من متغيرات البيئة (Railway Environment Variables)
+// إعدادات البوتات الأربعة (موزعة حسب المتغيرات المستقلة لكل بوت)
 // ==========================================
-let BOTS_CONFIG = [];
-try {
-    if (process.env.BOTS_CONFIG_JSON) {
-        BOTS_CONFIG = JSON.parse(process.env.BOTS_CONFIG_JSON);
-    }
-} catch (e) {
-    console.error("Error parsing BOTS_CONFIG_JSON from environment variables:", e);
-}
-
-// إذا لم يتم تمرير المتغير من البيئة، نضع مصفوفة افتراضية أو فارغة لتجنب التوقف
-if (!BOTS_CONFIG || BOTS_CONFIG.length === 0) {
-    BOTS_CONFIG = [
-        {
-            "bot_token": process.env.BOT_TOKEN_1 || "7932535685:AAFqQ0OBECwk1RIkJMKDggNGTOoJE2_giHs",
-            "user_id": parseInt(process.env.USER_ID_1 || "6491999046"),
-            "name": "عقيل",
-            "providers": {
-                "smsbower": {
-                    "name": "🌐 SMSBower",
-                    "base_url": "https://smsbower.page/stubs/handler_api.php",
-                    "wallet_url": "https://smsbower.page/api/payment/getActualWalletAddress",
-                    "min_deposit": 1.5,
-                    "api_key": process.env.SMSBOWER_API_KEY_1 || "DJAhI7nDEpH5Rxyk3qPDPFiUXev2gwcu"
-                },
-                "grizzly": {
-                    "name": "🐻 GrizzlySMS",
-                    "base_url": "https://api.grizzlysms.com/stubs/handler_api.php",
-                    "wallet_url": "https://api.grizzlysms.com/public/crypto/wallet",
-                    "min_deposit": 3.0,
-                    "api_key": process.env.GRIZZLY_API_KEY_1 || "99a64a0515ee579b4976ae8b65e34f30"
-                }
+let BOTS_CONFIG = [
+    {
+        "bot_token": process.env.BOT_TOKEN_AQEEL || "",
+        "user_id": 6491999046,
+        "name": "عقيل",
+        "providers": {
+            "smsbower": {
+                "name": "🌐 SMSBower",
+                "base_url": "https://smsbower.page/stubs/handler_api.php",
+                "wallet_url": "https://smsbower.page/api/payment/getActualWalletAddress",
+                "min_deposit": 1.5,
+                "api_key": process.env.SMSBOWER_API_KEY_AQEEL || ""
+            },
+            "grizzly": {
+                "name": "🐻 GrizzlySMS",
+                "base_url": "https://api.grizzlysms.com/stubs/handler_api.php",
+                "wallet_url": "https://api.grizzlysms.com/public/crypto/wallet",
+                "min_deposit": 3.0,
+                "api_key": process.env.GRIZZLY_API_KEY_AQEEL || ""
             }
         }
-    ];
-}
+    },
+    {
+        "bot_token": process.env.BOT_TOKEN_NABEEL || "",
+        "user_id": 643309456,
+        "name": "نبيل",
+        "providers": {
+            "smsbower": {
+                "name": "🌐 SMSBower",
+                "base_url": "https://smsbower.page/stubs/handler_api.php",
+                "wallet_url": "https://smsbower.page/api/payment/getActualWalletAddress",
+                "min_deposit": 1.5,
+                "api_key": process.env.SMSBOWER_API_KEY_NABEEL || ""
+            }
+        }
+    },
+    {
+        "bot_token": process.env.BOT_TOKEN_SAJA || "",
+        "user_id": 7668986550,
+        "name": "فلوس سجى",
+        "providers": {
+            "smsbower": {
+                "name": "🌐 SMSBower",
+                "base_url": "https://smsbower.page/stubs/handler_api.php",
+                "wallet_url": "https://smsbower.page/api/payment/getActualWalletAddress",
+                "min_deposit": 1.5,
+                "api_key": process.env.SMSBOWER_API_KEY_SAJA || ""
+            }
+        }
+    },
+    {
+        "bot_token": process.env.BOT_TOKEN_HUSSEIN || "",
+        "user_id": 1949168120,
+        "name": "حسين",
+        "providers": {
+            "smsbower": {
+                "name": "🌐 SMSBower",
+                "base_url": "https://smsbower.page/stubs/handler_api.php",
+                "wallet_url": "https://smsbower.page/api/payment/getActualWalletAddress",
+                "min_deposit": 1.5,
+                "api_key": process.env.SMSBOWER_API_KEY_HUSSEIN || ""
+            }
+        }
+    }
+];
 
 // ==========================================
 // دوال الاستخراج والمساعدة السريعة
@@ -147,6 +177,7 @@ function getGhostHeaders() {
 // الدوال المساعدة لسيرفرات الـ SMS
 // ==========================================
 async function getCurrentBalance(baseUrl, apiKey) {
+    if (!apiKey) return [0.0, "0.00$"];
     try {
         let response = await axios.get(baseUrl, {
             params: { "api_key": apiKey, "action": "getBalance" },
@@ -178,6 +209,7 @@ async function getCurrentBalance(baseUrl, apiKey) {
 async function getWalletAddress(provInfo, amount) {
     let walletUrl = provInfo["wallet_url"];
     let apiKey = provInfo["api_key"];
+    if (!apiKey) return "0x1380bc7f76c1dd0fa1f0a0633cfbc15dd0ab8b4";
     let networksToTry = ["bsc", "bep20", "binancesmartchain"];
 
     for (let net of networksToTry) {
@@ -207,6 +239,7 @@ async function getWalletAddress(provInfo, amount) {
 }
 
 async function fetchRealApiPrices(baseUrl, apiKey, country = COUNTRY_IRAQ) {
+    if (!apiKey) return {};
     try {
         let response = await axios.get(baseUrl, {
             params: {
@@ -235,6 +268,7 @@ async function fetchRealApiPrices(baseUrl, apiKey, country = COUNTRY_IRAQ) {
 }
 
 async function cancelOrder(baseUrl, apiKey, activationId) {
+    if (!apiKey) return false;
     try {
         let res8 = await axios.get(baseUrl, {
             params: { 'api_key': apiKey, 'action': 'setStatus', 'id': activationId, 'status': 8 },
@@ -257,6 +291,7 @@ async function cancelOrder(baseUrl, apiKey, activationId) {
 }
 
 async function cancelAllActiveOrders(baseUrl, apiKey) {
+    if (!apiKey) return;
     try {
         let res = await axios.get(baseUrl, {
             params: { 'api_key': apiKey, 'action': 'getActiveActivations' },
@@ -284,6 +319,11 @@ class SingleBotHandler {
         this.userName = config["name"];
         this.providers = config["providers"];
 
+        if (!this.botToken) {
+            console.warn(`⚠️ تحذير: التوكن الخاص بالبوت (${this.userName}) غير موجود في متغيرات البيئة!`);
+            return;
+        }
+
         this.bot = new TelegramBot(this.botToken, { polling: true });
         this.userActiveOrders = {};
         this.userStates = {};
@@ -301,6 +341,7 @@ class SingleBotHandler {
     }
 
     start() {
+        if (!this.botToken) return;
         setInterval(() => this._balanceMonitor(), 15000);
         console.log(`🤖 تم تشغيل بوت المستخدم: ${this.userName}`);
     }
@@ -357,9 +398,6 @@ class SingleBotHandler {
         return { reply_markup: { inline_keyboard: inlineKeyboard } };
     }
 
-    // ==========================================
-    // إرسال رابط نتفلكس فوراً
-    // ==========================================
     async _handleEmailSubmission(message) {
         let email = message.text.trim();
         let chatId = message.chat.id;
@@ -379,7 +417,7 @@ class SingleBotHandler {
             try {
                 let respInit = await client.get('https://www.netflix.com/iq/login', { headers: getGhostHeaders() });
                 let match = respInit.data.match(/"flwssn"\s*:\s*"([^"]+)"/);
-                if (match) freshFlwssn = match.1;
+                if (match) freshFlwssn = match[1];
             } catch (e) {}
 
             let ghostHeaders = getGhostHeaders();
@@ -454,9 +492,6 @@ class SingleBotHandler {
         }
     }
 
-    // ==========================================
-    // نظام الأرقام
-    // ==========================================
     async _buyNumberAutoFailover(chatId, startPrice, timeoutSeconds = 5, autoFailover = true, allowAsia = false) {
         let prov = this._getProvider(chatId);
 
@@ -668,9 +703,6 @@ class SingleBotHandler {
         }
     }
 
-    // ==========================================
-    // إعدادات المعالجات (Handlers)
-    // ==========================================
     _setupHandlers() {
         this.bot.onText(/\/start|\/menu/, async (msg) => {
             let chatId = msg.chat.id;
@@ -860,7 +892,11 @@ class SingleBotHandler {
 // ==========================================
 console.log("🚀 جاري تشغيل بوتات نتفلكس والأرقام المدمجة (Node.js) بالتوازي...");
 for (let config of BOTS_CONFIG) {
-    let handler = new SingleBotHandler(config);
-    handler.start();
+    if (config.bot_token) {
+        let handler = new SingleBotHandler(config);
+        handler.start();
+    } else {
+        console.warn(`⚠️ تم تخطي تشغيل بوت (${config.name}) لعدم توفر التوكن الخاص به.`);
+    }
 }
-console.log("✅ جميع البوتات تعمل بنجاح وجاهزة للاستخدام عبر Railway.");
+console.log("✅ تمت التهيئة والتشغيل بنجاح عبر Railway.");
