@@ -13,10 +13,12 @@ const PROXIES = {
 };
 
 const IDENTITY_COOKIES = {
-    "gsid": "31793dad-378b-4b3f-a31d-6830273a78f5",
-    "NetflixId": "v%3D3%26ct%3DBgjHlOvcAxKrAsPHtSnrZ9GKORSMuemrTl8covHfrSmMHg1VM44L77Jrwx2uMz07p6sVGf_wgQ347NiE9t-E6u6b1UIjzpLBZj3RK-K12h2a9fOSlqkzKuknBnpr9jq_r_CA258gC-GIMbcVrrpesjVwF_PFBsXdBEvXRpBITMlUtc9t8ZYnmXJhc-UYji_EIctXdNnTV58Q5z2C4uu0_UeYZdSjHfJ7kaWwoiTq4gXly5kgGIL3lYyLGIuI64ektCOwtw56c3xeAxi347qIWa9yUJu98ag5MFObpYDnt7dtyb_t1sWrLejZLVFlmRH3O1tvrGNQ1Gg1YWtu8M2UyONPETTUIk03-XuwOeq38x38W5yhRkQERjLBXMxxfEE2riISV__maFrywZ0aM2XKOy121xIUGAYiDgoMWP4bq858s_MFPNW8",
-    "nfvdid": "BQFmAAEBEFG3E8P1gRYF0CWTHucUHvRAr4WoXZoXMCJsHpmZWCwV23Wvz4jL7B_S3wcmhclGbFwicS-7sV38gw0R4uqceBim1JQ-_tiQJZ0wUNES6bl9Yw%3D%3D",
-    "SecureNetflixId": "v%3D3%26mac%3DAQEAEQABABQrKG3XWM4a01dvho67JcWEdpgOEh3Iqnw.%26dt%3D1786546366150"
+    "_OT_sm": "87b6a5c0-0104-4e96-a291-092c11350111",
+    "netflix-sans-bold-3-loaded": "true",
+    "netflix-sans-normal-3-loaded": "true",
+    "nfvdid": "BQFmAAEBEFGxrT9_8dyFnfgAtq7v_xhgB5IUwxosEj6z9zbtFKrPR-co3rgxxH06Jk-NF7xVvRSHAAe1WVxAZHA3mgALsUkMoIB9uBDuDQJzoslvSd3xgfEiSsEJDlSLLqOTOBWbGQoL5QVzwZWHp11kewdhOECH",
+    "OptanonAlertBoxClosed": "2026-08-03T19:41:18.294Z",
+    "OptanonConsent": "isGpcEnabled=0&datestamp=Mon+Aug+24+2026+20%3A44%3A00+GMT%2B0300+(Arabian+Standard+Time)&version=202607.1.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&consentId=7bd9e4d2-fb6b-4b53-9f19-5721c91464e3&interactionCount=2&isAnonUser=1&prevHadToken=0&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1&fclco=&intType=3&crTime=1785786078984&geolocation=IQ%3BKA&AwaitingReconsent=false"
 };
 
 const USER_AGENTS = [
