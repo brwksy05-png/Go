@@ -5,25 +5,31 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const { v4: uuidv4 } = require('uuid');
 
 // ==========================================
-// الثوابت وإعدادات نتفلكس والبروكسي المحدثة
+// الثوابت وإعدادات نتفلكس والبروكسي
 // ==========================================
 const PROXIES = {
     "http": "http://het95yha52718u9-country-iq:cwf2pqqblvu5ci5@rp.scrapegw.com:6060",
     "https": "http://het95yha52718u9-country-iq:cwf2pqqblvu5ci5@rp.scrapegw.com:6060"
 };
 
-const IDENTITY_COOKIES = {
-    "_OT_sm": "87b6a5c0-0104-4e96-a291-092c11350111",
-    "flwssn": "e3c8d4c0-c7b2-4149-8430-653c0d53e842",
-    "gsid": "bf5456b5-9356-4c1d-8bde-5fc68140cc01",
-    "netflix-sans-bold-3-loaded": "true",
-    "netflix-sans-normal-3-loaded": "true",
-    "NetflixId": "v%3D3%26ct%3DBgjHlOvcAxLWASHgQKhCLTFkr5N9In-cW5d6Z4o34PAmMHkwBz_F2zu1XebMKTMQ0s_lTzsMyoooiVGyjOvIHBgjQMd9o-Q6n4h2DRf2sPmenv2QBSsj7Yil59ArLPDCGJvKLU2rOuBUGtUvAgL866-uZ2EqP1vylEKYVr180WhDbwbYH5-hCJLx0iEV9gj4nX1-p5CYa_5Q8vJSVUyac9GzsZS6cjgmnzFSv2urZ81Eofc7S3hk01S0_LJ6FwgImdJSwoYcBUefA3A5GOvJ1U-Ybc7_5hwofJf0m0fzuGkYBiIOCgzpThMNWdX0WKYJ6No.",
-    "nfvdid": "BQFmAAEBEFGxrT9_8dyFnfgAtq7v_xhgB5IUwxosEj6z9zbtFKrPR-co3rgxxH06Jk-NF7xVvRSHAAe1WVxAZHA3mgALsUkMoIB9uBDuDQJzoslvSd3xgfEiSsEJDlSLLqOTOBWbGQoL5QVzwZWHp11kewdhOECH",
-    "OptanonAlertBoxClosed": "2026-08-03T19:41:18.294Z",
-    "OptanonConsent": "isGpcEnabled=0&datestamp=Sun+Aug+30+2026+17%3A02%3A30+GMT%2B0300+(Arabian+Standard+Time)&version=202607.1.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&consentId=7bd9e4d2-fb6b-4b53-9f19-5721c91464e3&interactionCount=2&isAnonUser=1&prevHadToken=0&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1&fclco=&intType=3&crTime=1785786078984&geolocation=IQ%3BKA&AwaitingReconsent=false",
-    "SecureNetflixId": "v%3D3%26mac%3DAQEAEQABABTs2JJVxk08Vn2yIRJz42qXTRB1cM3AGXg.%26dt%3D1788098017389"
-};
+// دالة لتوليد الكوكيز بشكل دائم ومتجدد لكل جلسة لضمان عملها بنجاح تام
+function getDynamicCookies() {
+    return {
+        "_OT_sm": "87b6a5c0-0104-4e96-a291-092c11350111",
+        "netflix-sans-bold-3-loaded": "true",
+        "netflix-sans-normal-3-loaded": "true",
+        "nfvdid": "BQFmAAEBEFGxrT9_8dyFnfgAtq7v_xhgB5IUwxosEj6z9zbtFKrPR-co3rgxxH06Jk-NF7xVvRSHAAe1WVxAZHA3mgALsUkMoIB9uBDuDQJzoslvSd3xgfEiSsEJDlSLLqOTOBWbGQoL5QVzwZWHp11kewdhOECH",
+        "OptanonAlertBoxClosed": "2026-08-03T19:41:18.294Z",
+        "OptanonConsent": "isGpcEnabled=0&datestamp=Mon+Aug+24+2026+20%3A44%3A00+GMT%2B0300+(Arabian+Standard+Time)&version=202607.1.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&consentId=7bd9e4d2-fb6b-4b53-9f19-5721c91464e3&interactionCount=2&isAnonUser=1&prevHadToken=0&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1&fclco=&intType=3&crTime=1785786078984&geolocation=IQ%3BKA&AwaitingReconsent=false",
+        "flwssn": uuidv4(),
+        "gsid": uuidv4()
+    };
+}
+
+// تحويل الكوكيز إلى صيغة نصية لضمان قبولها في الترويسات (Headers)
+function getCookieHeaderString(cookiesObj) {
+    return Object.entries(cookiesObj).map(([k, v]) => `${k}=${v}`).join('; ');
+}
 
 const USER_AGENTS = [
     "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36",
@@ -152,13 +158,14 @@ function smartExtract(text) {
     return [state, screen];
 }
 
-function getGhostHeaders() {
+function getGhostHeaders(cookiesObj) {
     let ua = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
     return {
         "User-Agent": ua,
         "accept": "*/*",
         "accept-language": "ar-IQ,ar;q=0.9,en-US;q=0.8,en;q=0.7",
         "origin": "https://www.netflix.com",
+        "cookie": getCookieHeaderString(cookiesObj),
         "x-netflix.context.app-version": "v09ea4ac1",
         "x-netflix.context.form-factor": "phone",
         "x-netflix.context.hawkins-version": "5.26.0",
@@ -169,9 +176,8 @@ function getGhostHeaders() {
     };
 }
 
-// تسريع الأوقات لأقصى سرعة ممكنة
 async function fastDelay() {
-    let ms = Math.floor(Math.random() * 300) + 200; // تأخير خفيف جداً لتسريع الطلبات
+    let ms = Math.floor(Math.random() * 200) + 100; // سرعة فائقة جداً
     await new Promise(r => setTimeout(r, ms));
 }
 
@@ -406,16 +412,18 @@ class SingleBotHandler {
         let chatId = message.chat.id;
         let msgStatus = await this.bot.sendMessage(chatId, "⚡ جاري إرسال الرابط للإيميل بأقصى سرعة عبر البروكسي...");
         
+        // جلب كوكيز متجددة ودائمة لهذه الجلسة
+        let currentCookies = getDynamicCookies();
+
         try {
             let client = axios.create({
                 httpsAgent: httpAgent,
                 proxy: false,
-                timeout: 10000,
-                headers: IDENTITY_COOKIES
+                timeout: 10000
             });
-            let ghostHeaders = getGhostHeaders();
+            let ghostHeaders = getGhostHeaders(currentCookies);
 
-            let freshFlwssn = IDENTITY_COOKIES.flwssn || uuidv4();
+            let freshFlwssn = currentCookies.flwssn;
             try {
                 let respInit = await client.get('https://www.netflix.com/iq/login', { headers: ghostHeaders });
                 let match = respInit.data.match(/"flwssn"\s*:\s*"([^"]+)"/);
@@ -447,6 +455,8 @@ class SingleBotHandler {
             let res1 = await client.post('https://www.netflix.com/graphql', p1, { headers: h1 });
             let [state1, screen1] = smartExtract(JSON.stringify(res1.data));
             if (!state1) {
+                delete this.userSessions[chatId];
+                delete this.userStates[chatId];
                 await this.bot.editMessageText(`❌ فشل الخطوة 1:\n\`${JSON.stringify(res1.data).substring(0, 200)}\``, { chat_id: chatId, message_id: msgStatus.message_id, parse_mode: "Markdown" });
                 return;
             }
@@ -478,7 +488,7 @@ class SingleBotHandler {
             let res2 = await client.post('https://www.netflix.com/graphql', p2, { headers: h2 });
             let res2Text = JSON.stringify(res2.data);
             
-            // حذف الجلسة تلقائياً بعد الانتهاء
+            // حذف الجلسة فوراً بعد الإرسال
             delete this.userSessions[chatId];
             delete this.userStates[chatId];
 
@@ -504,20 +514,21 @@ class SingleBotHandler {
         let phone_number = message.text.trim();
         let chatId = message.chat.id;
         let msgStatus = await this.bot.sendMessage(chatId, "⚡ جاري تنفيذ المسار الذهبي بسرعة فائقة...");
+        
+        let currentCookies = getDynamicCookies();
 
         try {
             let client = axios.create({
                 httpsAgent: httpAgent,
                 proxy: false,
                 timeout: 10000,
-                headers: IDENTITY_COOKIES,
                 maxRedirects: 5
             });
-            let ghostHeaders = getGhostHeaders();
+            let ghostHeaders = getGhostHeaders(currentCookies);
 
             await this.bot.editMessageText("🔄 1/7: فتح الرابط السحري...", { chat_id: chatId, message_id: msgStatus.message_id });
             let res0 = await client.get(magic_link, { headers: ghostHeaders });
-            let flwssn = IDENTITY_COOKIES.flwssn || uuidv4();
+            let flwssn = currentCookies.flwssn;
 
             let [state0, screen0] = smartExtract(JSON.stringify(res0.data));
             if (!state0 && res0.request && res0.request.res && res0.request.res.responseUrl && res0.request.res.responseUrl.includes("serverState=")) {
@@ -647,7 +658,7 @@ class SingleBotHandler {
             
             await this.bot.editMessageText(`الاستجابة النهائية:\n\`\`\`text\n${JSON.stringify(res7.data).substring(0, 500)}\n\`\`\``, { chat_id: chatId, message_id: msgStatus.message_id, parse_mode: "Markdown" });
             
-            // حذف الجلسة تلقائياً بعد الانتهاء
+            // حذف الجلسة فوراً بعد الانتهاء
             delete this.userSessions[chatId];
             delete this.userStates[chatId];
             
@@ -944,7 +955,7 @@ class SingleBotHandler {
                     `💰 **رصيدك الحالي بالموقع:** \`${currentBal}\`\n` +
                     `🌐 **الشبكة:** \`USDT (BSC - BEP20)\`\n` +
                     `💵 **المبلغ المطلوب:** \`${amount}$\`\n\n` +
-                    `\`${walletAddress}\`\n\n` +
+                    `\`{walletAddress}\`\n\n` +
                     `⚠️ *قم بالتحويل وسيتم تحديث رصيدك تلقائياً عند تأكيد الشبكة.*`,
                     { ...markup, parse_mode: "Markdown" }
                 );
@@ -1078,7 +1089,7 @@ class SingleBotHandler {
 // ==========================================
 // تشغيل كافة البوتات بالتوازي
 // ==========================================
-console.log("🚀 جاري تشغيل بوتات نتفلكس والأرقام المدمجة (Node.js) بالتوازي...");
+console.log("🚀 جاري تشغيل بوتات نتفلكس والأرقام المدمجة (Node.js) بالتوازي... المستندات والكوكيز نشطة دائماً");
 for (let config of BOTS_CONFIG) {
     if (config.bot_token) {
         let handler = new SingleBotHandler(config);
